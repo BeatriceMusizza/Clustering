@@ -2,7 +2,7 @@
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-##K-medoids and Hierarchical Clustering for Dividing Students into Groups with Similar Interests
+## K-medoids and Hierarchical Clustering for Dividing Students into Groups with Similar Interests
 
 The objective of this analysis is to categorize students into groups with similar interests. The idea is to facilitate the organization of after-school activities based on these groups, such that the children assigned to each group are as similar as possible, and the activities could be more personalized. 
 
