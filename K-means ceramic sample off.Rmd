@@ -2,7 +2,7 @@
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-##K-means to Categorize Ceramic Samples based on their Chemical Composition
+## K-means to Categorize Ceramic Samples based on their Chemical Composition
 
 This application concerns the chemical composition of 44 ceramic samples present in dataset that presents the percentage of different elements in weight and parts per million. The primary goal is to employ K-means clustering to categorize ceramic body samples based on their chemical composition. The visualization of datapoints and clustering results will be aided by PCA and a heatmap.
 
