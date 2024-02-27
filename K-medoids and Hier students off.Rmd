@@ -1,0 +1,395 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##K-medoids and Hierarchical Clustering for Dividing Students into Groups with Similar Interests
+
+The objective of this analysis is to categorize students into groups with similar interests. The idea is to facilitate the organization of after-school activities based on these groups, such that the children assigned to each group are as similar as possible, and the activities could be more personalized. 
+
+The methodology involves a stepwise approach, beginning with data preparation and exploration. Subsequently, the K-medoids clustering algorithm is applied. We will visualize the clustering using a chi-squared test to identify distinguishing variables. 
+Then, an alternative approach using hierarchical clustering is present, and the two clustering methods are compared.
+
+#### Data Collection
+The dataset for this study was obtained from the UCI Machine Learning Repository [https://archive.ics.uci.edu/dataset/856/higher+education+students+performance+evaluation]. This dataset focus on personal and family information, including education habits, of students from the Faculty of Engineering and Faculty of Educational Sciences in an American University in 2019.
+
+#### Variables
+The dataset presents variables of different types, such as demographic information, academic details, and personal preferences. Notable variables include: student age, sex, high school type, scholarship type, additional work, artistic or sports activity, partner status, total salary, parental education and occupation, study habits, and performance metrics such as cumulative grade point averages.
+
+
+#### Methodology
+
+1. **Data Preparation and Exploration** The initial step involves selecting relevant features and exploring the characteristics of the dataset.
+
+2. **K-medoids Clustering** The K-medoids algorithm will be applied to partition the students and the best number of cluster will be selected.
+
+3. **Visualisation of the Clustering: Significant Attributes** the differences in clustering will be visualized, using a chi-squared test to find the most distinguishing variables.
+
+4. **Hierarchical Clustering** An alternative approach using hierarchical clustering will be explored.
+
+5. **Comparison between Hierarchical and K-medoids Clustering** The two clustering approaches will be compared, using two metrics.
+
+### 1. Data Preparation and Exploration
+We start by reading the data.
+
+```{r}
+studentsdata <- read.csv("/Users/beatricemusizza/Desktop/students.csv")
+head(studentsdata)
+```
+
+We observe that the attributes' levels lack clear identification and the column names lack significance. We decide to assigne meaningful names to factors and to their levels and we will transform columns into factors where necessary (code is omitted for clarity, we just print the summary).
+
+```{r }
+# Change column names
+colnames(studentsdata) <- c( "Student_ID", "Student_Age", "Sex", 
+                            "HighSchool_Type", "Scholarship_type", "Additional_work", 
+                            "Artistic_Sports_Activity", "Partner", "Total_Salary", 
+                            "Transportation", "Accommodation_Type", "Mothers_Education", 
+                            "Fathers_Education", "Siblings_Count", "Parental_Status", 
+                            "Mothers_Occupation", "Fathers_Occupation", "Weekly_Study_Hours", 
+                            "Reading_Frequency_Non_Scientific", "Reading_Frequency_Scientific", 
+                            "Attendance_Seminars_Conferences", "Impact_Projects_Activities", 
+                            "Attendance_Classes", "Preparation_Midterm_Exams_1", 
+                            "Preparation_Midterm_Exams_2", "Taking_Notes_Classes", 
+                            "Listening_Classes", "Discussion_Improves_Interest", 
+                            "Flip_Classroom", "CGPA_Last_Semester", "Expected_CGPA_Graduation", 
+                            "Course_ID", "OUTPUT_Grade")
+studentsdata$Student_Age <- factor(studentsdata$Student_Age, levels = c(1, 2, 3), labels = c("18-21", "22-25", "above 26"))
+studentsdata$Sex <- factor(studentsdata$Sex, levels = c(1, 2), labels = c("female", "male"))
+studentsdata$HighSchool_Type <- factor(studentsdata$HighSchool_Type, levels = c(1, 2, 3), labels = c("private", "state", "other"))
+studentsdata$Scholarship_type <- factor(studentsdata$Scholarship_type, levels = c(1, 2, 3, 4, 5), labels = c("None", "25%", "50%", "75%", "Full"))
+studentsdata$Additional_work <- factor(studentsdata$Additional_work, levels = c(1, 2), labels = c("Yes", "No"))
+studentsdata$Artistic_Sports_Activity <- factor(studentsdata$Artistic_Sports_Activity, levels = c(1, 2), labels = c("Yes", "No"))
+studentsdata$Partner <- factor(studentsdata$Partner, levels = c(1, 2), labels = c("Yes", "No"))
+studentsdata$Total_Salary <- factor(studentsdata$Total_Salary, levels = c(1, 2, 3, 4, 5), labels = c("USD 135-200", "USD 201-270", "USD 271-340", "USD 341-410", "above 410"))
+studentsdata$Transportation <- factor(studentsdata$Transportation, levels = c(1, 2, 3, 4), labels = c("Bus", "Private car/taxi", "bicycle", "Other"))
+studentsdata$Accommodation_Type <- factor(studentsdata$Accommodation_Type, levels = c(1, 2, 3, 4), labels = c("rental", "dormitory", "with family", "Other"))
+studentsdata$Mothers_Education <- factor(studentsdata$Mothers_Education, levels = c(1, 2, 3, 4, 5, 6), labels = c("primary school", "secondary school", "high school", "university", "MSc.", "Ph.D."))
+studentsdata$Fathers_Education <- factor(studentsdata$Fathers_Education, levels = c(1, 2, 3, 4, 5, 6), labels = c("primary school", "secondary school", "high school", "university", "MSc.", "Ph.D."))
+studentsdata$Siblings_Count <- factor(studentsdata$Siblings_Count, levels = c(1, 2, 3, 4, 5), labels = c("1", "2", "3", "4", "5 or above"))
+studentsdata$Parental_Status <- factor(studentsdata$Parental_Status, levels = c(1, 2, 3), labels = c("married", "divorced", "died - one of them or both"))
+studentsdata$Mothers_Occupation <- factor(studentsdata$Mothers_Occupation, levels = c(1, 2, 3, 4, 5, 6), labels = c("retired", "housewife", "government officer", "private sector employee", "self-employment", "other"))
+studentsdata$Fathers_Occupation <- factor(studentsdata$Fathers_Occupation, levels = c(1, 2, 3, 4, 5), labels = c("retired", "government officer", "private sector employee", "self-employment", "other"))
+studentsdata$Weekly_Study_Hours <- factor(studentsdata$Weekly_Study_Hours, levels = c(1, 2, 3, 4, 5), labels = c("None", "<5 hours", "6-10 hours", "11-20 hours", "more than 20 hours"))
+studentsdata$Reading_Frequency_Non_Scientific <- factor(studentsdata$Reading_Frequency_Non_Scientific, levels = c(1, 2, 3), labels = c("None", "Sometimes", "Often"))
+studentsdata$Reading_Frequency_Scientific <- factor(studentsdata$Reading_Frequency_Scientific, levels = c(1, 2, 3), labels = c("None", "Sometimes", "Often"))
+studentsdata$Attendance_Seminars_Conferences <- factor(studentsdata$Attendance_Seminars_Conferences, levels = c(1, 2), labels = c("Yes", "No"))
+studentsdata$Impact_Projects_Activities <- factor(studentsdata$Impact_Projects_Activities, levels = c(1, 2, 3), labels = c("positive", "negative", "neutral"))
+studentsdata$Attendance_Classes <- factor(studentsdata$Attendance_Classes, levels = c(1, 2, 3), labels = c("always", "sometimes", "never"))
+studentsdata$Preparation_Midterm_Exams_1 <- factor(studentsdata$Preparation_Midterm_Exams_1, levels = c(1, 2, 3), labels = c("alone", "with friends", "not applicable"))
+studentsdata$Preparation_Midterm_Exams_2 <- factor(studentsdata$Preparation_Midterm_Exams_2, levels = c(1, 2, 3), labels = c("closest date to the exam", "regularly during the semester", "never"))
+studentsdata$Taking_Notes_Classes <- factor(studentsdata$Taking_Notes_Classes, levels = c(1, 2, 3), labels = c("never", "sometimes", "always"))
+studentsdata$Listening_Classes <- factor(studentsdata$Listening_Classes, levels = c(1, 2, 3), labels = c("never", "sometimes", "always"))
+studentsdata$Discussion_Improves_Interest <- factor(studentsdata$Discussion_Improves_Interest, levels = c(1, 2, 3), labels = c("never", "sometimes", "always"))
+studentsdata$Flip_Classroom <- factor(studentsdata$Flip_Classroom, levels = c(1, 2, 3), labels = c("not useful", "useful", "not applicable"))
+studentsdata$CGPA_Last_Semester <- factor(studentsdata$CGPA_Last_Semester, levels = c(1, 2, 3, 4, 5), labels = c("<2.00", "2.00-2.49", "2.50-2.99", "3.00-3.49", "above 3.49"))
+studentsdata$Expected_CGPA_Graduation <- factor(studentsdata$Expected_CGPA_Graduation, levels = c(1, 2, 3, 4, 5), labels = c("<2.00", "2.00-2.49", "2.50-2.99", "3.00-3.49", "above 3.49"))
+studentsdata$OUTPUT_Grade <- factor(studentsdata$OUTPUT_Grade, levels = c(0, 1, 2, 3, 4, 5, 6, 7), labels = c("Fail", "DD", "DC", "CC", "CB", "BB", "BA", "AA"))
+summary(studentsdata)  
+```
+
+Given the domain knowledge for dividing students based on their interests, we have identify 28 features for consideration:
+
+1. Demographics:
+   - Student_Age (3 levels: "18-21", "22-25", "above 26")
+   - Sex ("female", "male")
+   - HighSchool_Type ("private", "state", "other")
+   - Accommodation_Type ("rental", "dormitory", "with family", "Other")
+   - Mothers_Education ("primary school", "secondary school", "high school", "university", "MSc.", "Ph.D.")
+   - Fathers_Education ("primary school", "secondary school", "high school", "university", "MSc.", "Ph.D.")
+   - Siblings_Count ("1", "2", "3", "4", "5 or above")
+   - Parental_Status ("married", "divorced", "died - one of them or both")
+
+2. Engagement and Participation:
+   - Additional_work ("Yes", "No")
+   - Artistic_Sports_Activity ("Yes", "No")
+   - Partner ("Yes", "No")
+   - Mothers_Occupation ("retired", "housewife", "government officer", "private sector employee", "self-employment", "other")
+   - Fathers_Occupation ("retired", "government officer", "private sector employee", "self-employment", "other")
+   - Weekly_Study_Hours ("None", "<5 hours", "6-10 hours", "11-20 hours", "more than 20 hours")
+   - Reading_Frequency_Non_Scientific ("None", "Sometimes", "Often")
+   - Reading_Frequency_Scientific ("None", "Sometimes", "Often")
+   - Attendance_Seminars_Conferences ("Yes", "No")
+   - Impact_Projects_Activities ("positive", "negative", "neutral")
+   - Attendance_Classes ("always", "sometimes", "never")
+   - Preparation_Midterm_Exams_1 ("alone", "with friends", "not applicable")
+   - Preparation_Midterm_Exams_2 ("closest date to the exam", "regularly during the semester", "never")
+   - Taking_Notes_Classes ("never", "sometimes", "always")
+   - Listening_Classes ("never", "sometimes", "always")
+
+3. Learning Preferences:
+   - Discussion_Improves_Interest ("never", "sometimes", "always")
+   - Flip_Classroom ("not useful", "useful", "not applicable")
+
+4. Academic Performance:
+   - CGPA_Last_Semester ("<2.00", "2.00-2.49", "2.50-2.99", "3.00-3.49", "above 3.49")
+   - Expected_CGPA_Graduation ("<2.00", "2.00-2.49", "2.50-2.99", "3.00-3.49", "above 3.49")
+   - OUTPUT_Grade ("Fail", "DD", "DC", "CC", "CB", "BB", "BA", "AA")
+
+#### Distance between points 
+To quantify the dissimilarity between data points, we employ the Hamming Distance, a metric designed for comparing two strings. This distance measure is characterized by the count of positions where corresponding symbols (characters or bits) in the two strings exhibit differences.
+
+We find the two closest datapoints (index 95 and 67) and notice only 2 columns exhibit variation: "Reading_Frequency_Scientific" and "OUTPUT_Grade".
+
+```{r }
+library(cultevo)
+library(cluster)
+hamm_dist <- hammingdists(studentsdata[, c(2:8, 11:31,33)])
+hamm_mat <- as.matrix(hamm_dist)
+min_indices <- which(hamm_mat == min(hamm_mat[hamm_mat != min(hamm_mat)]), arr.ind = TRUE)
+selected_rows <- studentsdata[min_indices[1, ], c(2:8, 11:31, 33)]
+print(selected_rows)
+```
+
+```{r }
+closesttbale<- studentsdata[which(hamm_mat == min(hamm_mat[hamm_mat != min(hamm_mat)]), 
+                          arr.ind = TRUE)[1, ],c(2:8, 11:31,33)]
+num_same_value_columns <- sum(apply(closesttbale, 2, function(col) length(unique(col)) == 1)) # 2 indicates the margin along which the function should be applied. 1 represents rows, and 2 represents columns.
+different_columns <- names(which(apply(closesttbale, 2, function(col) length(unique(col)) == 2)))
+```
+
+Similarly, we explore the most dissimilar datapoints within the dataset. We calculate the Hamming Distance and observe that only 3 columns share the same values, which are "Partner","Attendance_Seminars_Conferences" and "Expected_CGPA_Graduation"    
+
+```{r }
+library(cluster)
+hamm_dist <- hammingdists(studentsdata[, c(2:8, 11:31,33)])
+hamm_mat <- as.matrix(hamm_dist)
+print(studentsdata[which(hamm_mat == max(hamm_mat[hamm_mat != max(hamm_mat)]), 
+                          arr.ind = TRUE)[1, ],c(2:8, 11:31,33)])
+```
+```{r }
+differenttbale<- studentsdata[which(hamm_mat == max(hamm_mat[hamm_mat != max(hamm_mat)]), 
+                          arr.ind = TRUE)[1, ],c(2:8, 11:31,33)]
+num_same_value_columns2 <- sum(apply(differenttbale, 2, function(col) length(unique(col)) == 1))
+same_columns <- names(which(apply(differenttbale, 2, function(col) length(unique(col)) == 1)))
+```
+
+In conclusion, from a brief analysis, some datapoints vary significantly from one another. The small number of differing attributes in the closest points and the common attributes in the most dissimilar points suggest a potential heterogeneity in the dataset. Further exploration and clustering analysis may provide deeper insights into these observed patterns.
+
+
+### 2. K-medoids Clustering
+
+We perform the clustering and print the selected medoids.
+
+```{r}
+library(cluster)
+columns_for_clustering <- studentsdata[, c(2:8, 11:31,33)]
+k <- 3
+cluster_results3 <- pam(hamm_dist, k)
+print(cluster_results3$medoids)
+```
+
+Note: To ensure accurate clustering, we use the distance matrix instead of the dataset. This is crucial as the pam function relies on Euclidean (or Manhattan) distance when the dataset is directly applied.
+In this case,  the medoids correspond to data points with IDs 26, 33, and 98. 
+
+Now, let's see cluster assignments:
+
+```{r}
+library(knitr)
+set.seed(104)
+studentsdata$ClusterK3 <- as.factor(cluster_results3$clustering)
+
+kable(table(studentsdata$ClusterK3) ,
+      col.names = c("Cluster ", "Frequency"),
+      caption = "K-medoids Clustering")
+```
+
+We note a balanced distribution of datapoints among the clusters.
+
+#### Selection of the number of clusters and Visualisation of the Clustering
+
+**Shilouette Method**
+We now apply the shilouette method to assess the validity of clusters.\n
+This method evaluates the quality of clustering by measuring how well each data point fits into its assigned cluster compared to other clusters.\n
+The silhouette score ranges from -1 to 1, the higher the better.\n 
+
+Steps required for the calculation:\n
+1. Calculate Cluster Cohesion (a): For each data point within a cluster, compute the average distance from the data point to the other points within the same cluster. This value is called "a."\n
+2. Calculate Cluster Separation (b): For the same data point, calculate the average distance from the data point to all points in the nearest neighboring cluster (the cluster other than the one to which the data point belongs). This value is called "b."\n
+
+3. Compute Silhouette Score: The silhouette score for each data point is given by the formula: \n
+silhouette score = (b - a) / max(a, b). \n
+The idea behind this formula: \n
+-The numerator b-a quantifies the difference between the separation and cohesion.\n
+-The denominator max(a,b) normalizes this difference\n
+
+4. Compute the overall silhouette score for the clustering solution: the average of the silhouette scores for all data points.\n
+
+We calculate the score for each value of K [2,12] and plot the result.
+
+```{r}
+
+avg_silmed <- function(k, diss) {
+  pam.obj <- pam(diss, k = k) 
+  ss <- silhouette(pam.obj$cluster, diss)
+  mean(ss[, 3])
+}
+k.values <- 2:12
+# extract avg silhouette for 2-12 clusters
+avg_sil_valuesmed <- lapply(k.values, avg_silmed, diss = hamm_dist)
+plot(k.values, avg_sil_valuesmed,
+       type = "b", pch = 19, frame = FALSE, 
+       xlab = "Number of clusters K",
+       ylab = "Average Silhouettes")
+```
+
+Based on the silhouette scores, it appears that 4 is an optimal number of clusters for this dataset.
+
+```{r}
+set.seed(104)
+library(cluster)
+cluster_results4 <- pam(hamm_dist, 4)
+kable(cluster_results4$medoids, col.names = c("Medoid ID "))
+```
+
+In this case, the medoids are the data points with IDs 33 (as before), 29, 102, and 117. We also print the cluster assigments with 4 clusters. 
+
+```{r}
+studentsdata$ClusterK4 <- as.factor(cluster_results4$clustering)
+kable(table(studentsdata$ClusterK4) ,
+       col.names = c("Cluster ", "Frequency"),
+       caption = "K-medoids Clustering")
+```
+
+
+### 3. Visualisation of the Clustering: Significant Attributes
+
+Considering that we have a big number of features, to plot the differences among clusters, we need to choose the most differentiating variables.
+To do this, we employ the Chi-Square test for independence, evaluating the potential association between categorical variables. In this context, we will perform this test between all the features and the clustering assignment. 
+A significant result suggests that certain categorical variables have different distributions among the identified clusters, indicating that these variables contribute to the differentiation of the clusters. 
+
+When we perform a Chi-Square test using the chisq.test() function, if any level within a variable has zero observations in certain groups we can have some issues in calculating the p-value. The issue is that the test statistic becomes undefined when there are 0 counts in the contingency table, resulting in an undefined p-value. By adding 1 observation to all counts in the contingency table for the three cathegories presenting this problem, we ensure the avoidance of issues with undefined test statistics and p-values. 
+
+```{r}
+library(knitr) 
+suppressWarnings({ chi_square_results <- sapply(studentsdata[,c(2:8, 11:31,33)], function(x) {
+  table_result <- table(x, studentsdata$ClusterK4)
+  table_result <- table_result + 1
+  chisq.test(table_result)$p.value })
+print(chi_square_results)
+}) 
+```
+
+We now need to evaluate the significance of these results. We are conducting multiple sequential tests, and so we select a low threshold for significance: 0.001. This approach allow us to identify meaningful associations while managing the potential impact of conducting numerous tests consecutively.
+
+```{r}
+significance_level <- 0.001
+
+significant_attributes <- names(chi_square_results[chi_square_results < significance_level])
+non_significant_attributes <- names(chi_square_results[chi_square_results >= significance_level])
+
+cat("Significant attributes:", paste(significant_attributes, collapse = ", "), "\n\n")
+```
+
+This is a hint of the variables that have influenced clustering the most, we visualize some of these features with spine-plots. 
+
+```{r }
+par(mfrow=c(1,2))
+spineplot(studentsdata$Student_Age ~ studentsdata$ClusterK4, main = "Student Age by Cluster", xlab = "Cluster", ylab = "Student Age")
+spineplot(studentsdata$Sex	~ studentsdata$ClusterK4, main = "Sex by Cluster", xlab = "Cluster", ylab = "Sex	")
+spineplot(studentsdata$Scholarship_type ~ studentsdata$ClusterK4, main = "Scholarship type by Cluster", xlab = "Cluster", ylab = "Scholarship_type")
+spineplot(studentsdata$CGPA_Last_Semester ~ studentsdata$ClusterK4, main = "Expected CGPA by Cluster", xlab = "Cluster", ylab = "Expected_CGPA_Graduation")
+```
+
+The difference in the distributions of these attributes among clusters is evident.
+
+
+### 4. Hierarchical Clustering
+
+To further explore the clustering patterns and to compare results, we utilize hierarchical clustering and visualize the dendrograms for three linkage criteria.
+
+```{r }
+hca <- hclust(hamm_dist, method = "average")
+plot(hca, hang = -1, cex = 0.6, main="", xlab = "",labels = FALSE)
+```
+```{r }
+hcs <- hclust(hamm_dist, method = "single")
+plot(hcs, hang = -1, cex = 0.6, main="", xlab = "",labels = FALSE)
+
+hcc <- hclust(hamm_dist, method = "complete")
+plot(hcc, hang = -1, cex = 0.6, main="", xlab = "",labels = FALSE)
+```
+
+
+As expected, we observe that the dendrogram created with the single linkage criteria appears more unbalanced. In contrast, the dendrogram with the "complete" linkage criteria appears much more balanced.
+
+We select the "complete" criteria we proceed to cut the dendrogram into 4 clusters, the number of clusters selected before. This allows us to visually identify the four clusters within the hierarchical structure. The red-bordered rectangles highlight the 4 distinct clusters formed.
+
+```{r}
+hcc <- hclust(hamm_dist, method = "complete")
+plot(hcc, hang = -1, cex = 0.6, main="", xlab = "",labels = FALSE)
+rect.hclust(hcc, k = 4, border = "red")
+```
+
+We now compare the distribution of observations assigned by the two clustering methods, K-medoids and Hierarchical. 
+
+```{r }
+library(knitr)
+studentsdata$ClusterHier <- as.factor(cutree(hcc, k = 4))
+
+cluster_table_k4 <- table(studentsdata$ClusterK4)
+cluster_table_hier <- table(studentsdata$ClusterHier)
+
+kable(cluster_table_k4,
+      col.names = c("Cluster ", "Frequency"),
+      caption = "K-Medoids Clustering")
+kable(cluster_table_hier ,
+      col.names = c("Cluster ", "Frequency"),
+      caption = "Hierarchical Clustering")
+
+```
+
+We observe a notable imbalance in the distribution of clusters when utilizing the Hierarchical clustering method and more balanced distribution achieved through the K-medoids.
+
+
+### 5. Comparison between Hierarchical and K-medoids Clustering
+
+For a comprehensive assessment, we delve into the evaluation metrics outlined by Ferrando et al.[6].
+
+The Calinski-Harabasz (CHI) index (Caliński and Harabasz, 1974) and the Silhouette (SHI) index (Rousseeuw, 1987) are chosen metrics for this comparative analysis. \n
+
+CHI is a heuristic metric, defined as the ratio between the within-cluster dispersion and the between-cluster dispersion. There are no limits to its value, but it can be used to compare the results of clustering algorithms.\n
+The higher this metric is, the better is the clustering result, higher value of CH index means the clusters are dense and well separated.\n
+SHI was already used for the selection of the number of clusters. As we said, the higher the better.
+
+```{r}
+library("fpc")
+library(knitr)
+#for Hierarchical
+hcc <- hclust(hamm_dist, method = "complete")
+cluster_assignments <- cutree(hcc, k = 2)
+cluster_metricshier <- cluster.stats(hamm_dist, cluster_assignments)
+chi_valuehier <- cluster_metricshier$ch
+shi_valuehier <- cluster_metricshier$avg.silwidth
+
+# for K-medoids 
+cluster_results4 <- pam(hamm_dist, 4)
+cluster_metricskmedoids <- cluster.stats(hamm_dist, cluster_results4$clustering)
+chi_valuekmedoids <- cluster_metricskmedoids$ch
+shi_valuekmedoids <- cluster_metricskmedoids$avg.silwidth
+
+# data frame for the comparison
+cluster_data <- data.frame(
+  Method = c("k-medoids", "Hierarchical"),
+  CHI = c(chi_valuekmedoids, chi_valuehier),
+  SHI = c(shi_valuekmedoids, shi_valuehier)
+)
+kable(cluster_data, format = "markdown", col.names = c("Method", "CHI", "SHI"))
+
+``` 
+
+In this scenario, based on the calculated CHI and SHI metrics, the Hierarchical clustering method outperforms K-medoids. 
+In particular, CHI lacks a clear "acceptable" cutoff value, it is typically employed for comparing clustering solutions derived from the same data, differing either in the number of clusters or the clustering method used. Therefore, assessing the magnitude of improvement becomes challenging. However, it can be asserted that the Hierarchical clustering method performs better than K-medoids.
+On the other hand, for the Silhouette Index (SHI), where scores range from -1 to 1, a marginal improvement of 0.02 may not be considered substantial.
+
+
+### Conclusion 
+
+In conclusion, several key highlights emerge from the analysis:
+
+- The K-medoids clustering, followed by the chi-squared test, provided valuable insights into differentiating attributes, which emerged to be: Student_Age, Sex, Scholarship_type, Accommodation_Type, Siblings_Count, Reading_Frequency_Non_Scientific, Reading_Frequency_Scientific, Attendance_Seminars_Conferences, Taking_Notes_Classes, Discussion_Improves_Interest, Expected_CGPA_Graduation and OUTPUT_Grade.
+
+- Visualizing dendrograms for three linkage criteria allowed us to confirm that the "single" linkage criterion results in a more unbalanced distribution. 
+
+- The importance of methodological choices, such as the linkage criteria in the Hierarchical clustering, was highlighted in achieving meaningful clustering outcomes.
+
+- In conclusion, the hierarchical clustering method exhibited superior performance, particularly through the Calinski-Harabasz index, indicating denser and well-separated clusters. While the Silhouette index showed only a marginal improvement, both clustering methods facilitated student categorization. The analysis determined that the optimal number of clusters is four.
