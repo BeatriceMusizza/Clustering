@@ -1,0 +1,253 @@
+---
+title: "K-means to Categorize Ceramic Samples based on their Chemical Composition"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This application concerns the chemical composition of 44 ceramic samples. The dataset that presents the percentage of different elements in weight and parts per million. The primary goal is to employ K-means clustering to categorize ceramic body samples based on their chemical composition. The visualization of datapoints and clustering results will be aided by PCA and a heatmap.
+
+#### Data Collection
+The dataset for this study was obtained from the UCI Machine Learning Repository [https://archive.ics.uci.edu/dataset/583/chemical+composition+of+ceramic+samples], focusing on the chemical composition of 88 ceramic samples. We will use only the ones categorized as 'Body', 44 of them. 
+
+#### Variables
+The dataset includes the following key variables:
+
+- Ceramic.Name: Name of the ceramic types.
+- Part: A binary categorical variable indicating whether the sample is a 'Body' or 'Glaze.'
+- Na2O, MgO, Al2O3, SiO2, K2O, CaO, TiO2, Fe2O3: Percentage of the corresponding element in the ceramic sample in weight percentage (wt%) 
+- MnO, CuO, ZnO, PbO2, Rb2O, SrO, Y2O3, ZrO2, P2O5: Percentage of the corresponding element in the ceramic sample in parts per million (ppm).
+
+#### Methodology
+
+1. **Data Preparation and Exploration** The initial step involves data selection and understanding.
+2. **PCA** to identify the principal components that capture the maximum variance within the ceramic data.
+3. **K-means Clustering** The K-means algorithm will be applied to partition the ceramic samples.
+4. **Visualization of Datapoints with a Heatmap** To enhance interpretability, the results of the K-means clustering will be visualized using a heatmap. 
+
+#### Packages Used
+
+- Maechler, M., Rousseeuw, P., Struyf, A., Hubert, M., Hornik, K.(2022).  cluster: Cluster Analysis
+  Basics and Extensions. R package version 2.1.4.
+  
+- Hennig C (2023). _fpc: Flexible Procedures for Clustering_. R package version 2.2-11,
+  <https://CRAN.R-project.org/package=fpc>
+  
+- Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer,
+  New York. ISBN 0-387-95457-0
+  
+- Kolde R (2019). _pheatmap: Pretty Heatmaps_. R package version 1.0.12,
+  <https://CRAN.R-project.org/package=pheatmap>.
+  
+### 1. Data Preparation and Exploration
+
+We start by reading the data.
+
+```{r , echo=FALSE}
+ceramicdata <- read.csv("/Users/beatricemusizza/Desktop/ceramic.csv")
+head(ceramicdata)
+```
+
+For the purpose of clustering, our focus is solely on the ceramic samples classified as 'Body'. We begin by extracting and isolating rows where the 'Part' variable is labeled as 'Body' and then we drop this column.
+
+```{r, echo=FALSE}
+ceramicdatabody <- subset(ceramicdata, Part == "Body")
+unique_values <- unique(ceramicdatabody$Part)
+ceramicdatabody <- ceramicdatabody [,!names(ceramicdatabody ) %in% c("Part")]
+```
+
+#### Units of Measurement and data types: is clustering appropriate?
+
+The initial ninth elements in the dataset represent oxides expressed as weight percentages (wt%). The ninth element is Fe2O3, the last one expressed as weight percentage. The sum of these oxide percentages for a given sample approximately equals 99%. This observation reflects the comprehensive coverage of the predominant chemical constituents in the ceramic composition.
+To verify the accuracy of this representation, we conduct an examination, confirming that the summation of the first eight elements, including Fe2O3, indeed aligns closely with 99%. 
+
+```{r}
+sums_per_row_percent <- rowSums(ceramicdatabody[, 2:9], na.rm = TRUE)
+print(sums_per_row_percent)
+```
+
+The remaining 1% of the overall weight is represented by additional chemical components. The values of these additional components are expressed in parts per million (ppm). A discrepancy of three decimal places exists between the weight percentages and parts per million representation. 
+
+```{r}
+sums_per_row_ppm <- rowSums(ceramicdatabody[, 10:18], na.rm = TRUE) / 1000
+total_sums_per_row <- rowSums(cbind(sums_per_row_percent, sums_per_row_ppm), na.rm = TRUE)
+print(total_sums_per_row)
+```
+
+The code calculates the sum of weight percentages for oxide components and the sum of parts per million (ppm) values for other chemical components. The ppm values are converted to percentages by dividing by 1000. The resulting total sums per row are close to 100, indicating the overall balance and variability inherent in the measurement.
+
+The observation that the sum of percentages is consistently close to 100% means that when one feature is similar, it is likely that others are also similar, and vice versa. In other words, the proximity of one characteristic implies the likelihood of proximity in other characteristics. This aspect can influence the clustering process, as closely correlated features may overestimate the distance between samples.
+
+Now, we proceed to visualize the variables measured in weight percentages (%wt).
+
+```{r, echo=FALSE }
+library(MASS)
+pairs (ceramicdatabody[,2:9], panel= panel.smooth, pch=16, cex=0.4)
+```
+
+We notice some important correlations, but not all of the variables are correlated. 
+
+Now, we visualize the variables measured in parts per million (ppm).
+
+```{r, echo=FALSE }
+library(MASS)
+pairs (ceramicdatabody[, 10:18], panel= panel.smooth, pch=16, cex=0.4)
+```
+
+We don't notice evident patterns. 
+
+
+### 2. PCA 
+
+Given that the features exhibit complete correlation, PCA provides a viable solution by extracting a combination of the original explanatory variables that captures the maximum variance. To ensure standardized measures, the last columns, representing percentages, need to be divided by 100.
+
+```{r}
+ceramicdatabody[, 10:18] <- ceramicdatabody[, 10:18]/1000
+ceramic.pca <- princomp(ceramicdatabody[,2:18])
+ceramic.pca$loadings[, 1:5]
+```
+
+The loadings table presents the weights assigned to each original variable across the first Principal Components. These loadings represent the contribution of each variable to the creation of the PCs. 
+
+From this table we can see that the variables SiO2, Al2O3, K2O, and Fe2O3 exhibit significant contributions to the first Principal Components (PCs).
+
+These variables account for a substantial portion of the sample weight:\n
+- SiO2  represents approximately 70% of the weight of the samples.\n
+- Al2O3 constitutes around 20% of the weight of the samples.\n
+- K2O contributing heavily to PC2, K2O holds a weight of approximately 5% in the overall sample composition.\n
+- Fe2O3 represents around 2% of the weight of the samples.
+
+To perform clustering analysis, all 17 PCs will initially be considered. For visualization purposes, we will focus on the first two PCs. These two components explain approximately 97% of the variability, offering a concise and comprehensive representation of the dataset. \n
+Note: Performing clustering with all Principal Components (PCs) and subsequently plotting with the first two PCs is equivalent to directly clustering with only the first two PCs.
+
+#### Visualisation with PCA
+
+```{r, echo=FALSE}
+ceramic.pca <- princomp(ceramicdatabody[,2:18])
+ceramic.px <- predict (ceramic.pca) #project the original data onto the principal components
+plot(ceramic.px[, 1:2], xlab = "First principal component",
+     ylab = "Second principal component")
+```
+
+### 3. K-means Clustering 
+
+#### Selection of the Number of Clusters: the Elbow Method
+
+This method require to utilize the plot of the sum of squared distances against the number of clusters and to identified the "elbow" point. This point is considered to be a critical juncture where the rate of decrease in sum of squared distances slows down, indicating an optimal number of clusters for the given dataset.
+
+```{r}
+library(cluster)
+
+set.seed(123)
+
+k.max <- 15
+data <- ceramicdatabody[,2:18]
+wss <- sapply(1:k.max, 
+              function(k){kmeans(data, k, nstart=50,iter.max = 15 )$tot.withinss})
+
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+
+```
+
+Considering the limited number of data points and the observed plot, we identify the "elbow" at K=2. 
+
+#### Selection of the Number of Clusters: the Silhouette Method
+
+```{r}
+avg_silmed <- function(k, diss) {
+  kmeans.obj <- kmeans(ceramicdatabody[,2:18], k, nstart=50,iter.max = 15)
+  ss <- silhouette( kmeans.obj$cluster, diss)
+  mean(ss[, 3])
+}
+k.values <- 2:12
+# extract avg silhouette for 2-12 clusters
+avg_sil_valuesmed <- lapply(k.values, avg_silmed, diss = dist(ceramicdatabody[,2:18]) )
+plot(k.values, avg_sil_valuesmed,
+       type = "b", pch = 19, frame = FALSE, 
+       xlab = "Number of clusters K",
+       ylab = "Average Silhouettes")
+```
+
+From the plot, we identify K=2. 
+
+We start by performing K-means with K=2.
+
+```{r}
+set.seed(128)
+ceramic.pca <- princomp(ceramicdatabody[,2:18])
+km <- kmeans(ceramicdatabody[,2:18], 2)
+ceramic.px <- predict (ceramic.pca) #project the original data onto the principal components
+ceramic.centers <- predict(ceramic.pca, km$centers)
+plot(ceramic.px[, 1:2], type="n", xlab = "First principal component",
+     ylab = "Second principal component")
+points(ceramic.px[, 1:2], col = km$cluster, pch = 16,cex = 0.8)
+points(ceramic.centers[, 1:2], pch = 16, col = 1:3, cex = 1.5)
+```
+
+We then perform K-means with K=3.
+
+```{r}
+set.seed(128)
+ceramic.pca <- princomp(ceramicdatabody[,2:18])
+km <- kmeans(ceramicdatabody[,2:18], 3)
+ceramic.px <- predict (ceramic.pca) #project the original data onto the principal components
+ceramic.centers <- predict(ceramic.pca, km$centers)
+plot(ceramic.px[, 1:2], type="n", xlab = "First principal component",
+     ylab = "Second principal component")
+points(ceramic.px[, 1:2], col = km$cluster,  pch = 16,cex = 0.8)
+points(ceramic.centers[, 1:2], pch = 16, col = 1:4, cex = 1.5)
+```
+
+We notice the clustering performs well for both K=2 and K=3. The first principal component plays a significant role in differentiation. \n
+This suggests that the inherent structure within the data can be effectively captured by both two and three clusters, with the first principal component serving as a differentiating factor. \n
+
+Considering that the variables SiO2, Al2O3, K2O, and Fe2O3 are the only ones to contributes for the first Principal Components (PCs), these variables seems to be the most differentiating variables.\n
+Let's visualize the distribution of these 4 components with box-plots.
+
+```{r , echo=FALSE}
+par(mfrow=c(1,2))
+ceramicdatabody$Cluster <- as.factor(km$cluster)
+boxplot( ceramicdatabody$SiO2 ~ ceramicdatabody$Cluster ,  col = "lightblue", main = "SiO2 (%wt) by Cluster", xlab = "Cluster", ylab = "SiO2 (%wt)")
+boxplot( ceramicdatabody$Al2O3 ~ ceramicdatabody$Cluster ,  col = "lightblue", main = "Al2O3 (%wt) by Cluster", xlab = "Cluster", ylab = "Al2O3 (%wt)")
+boxplot( ceramicdatabody$K2O ~ ceramicdatabody$Cluster ,  col = "lightblue", main = "K2O (%wt) by Cluster", xlab = "Cluster", ylab = "K2O (%wt)")
+boxplot( ceramicdatabody$Fe2O3 ~ ceramicdatabody$Cluster ,  col = "lightblue", main = "Fe2O3 (%wt) by Cluster", xlab = "Cluster", ylab = "Fe2O3 (%wt)")
+```
+
+The difference in the distributions of the values among clusters is evident.
+
+
+### 4. Visualization of Datapoints with a Heatmap
+
+We use a heatmap to visualize datapoints in a way in which similar points appearing close in rows and columns.
+
+```{r, echo=FALSE }
+library("pheatmap")
+library(cluster)
+pheatmap (ceramicdatabody[,2:18], clustering_method = "complete",fontsize_row = 6 ) 
+```
+
+This picture is useful to keep in mind when we want to study these samples, as the closest ones are considered the most similar. Notably, there's a prevalence of SiO2 compared to other elements. 
+
+
+### Conclusion 
+
+In conclusion, several key highlights emerge from the analysis:
+
+- K-means has performed as a good tool n categorizing ceramic samples based on their chemical composition, offering the opportunities to study their relationships.
+
+- We concluded that the fact that the sum of percentages is 100%, and so that when one feature is similar, it is likely that others are also similar, was a way in which clustering could be better assessed, and not a problem for this analysis. 
+
+- The process of selecting of the number of clusters often requires a nuanced approach. In this case the silhouette method was clear, while the elbow method was less decisive.
+
+- Clustering performed effectively for both K=2 and K=3 and the first principal component served as a differentiating factor. 
+The difference in the distributions of the values of SiO2, Al2O3, K2O, and Fe2O3 among clusters was evident and this was in line with expectations. These variables are the main contributors to the first Principal Components (PCs).
+
+- In conclusion, we implemented a heatmap to visualize the samples, a more informative picture of the samples compared to the randomly ordered dataset. 
+
+### References
+
+[1] Ferrando M.,Nozza D., Hong T., Causone F. (2021) , Comparison of different clustering approaches on different databases of smart meter data, 17th IBPSA Conference.
